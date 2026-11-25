@@ -22,7 +22,7 @@ Keep the OCR and ASR modules separate from the classifier. They only produce tex
 
 ## Data and current model
 
-- Data is in `dataset_sentiment_ecommerce/` (ignored by `.gitignore`). Labels in the CSVs are `positif`, `neutre`, `negatif` (no accent).
+- Data is in `dataset_sentiment_ecommerce/`. It is tracked in git (added in the first commit), even though `.gitignore` lists it; new files added there would be ignored. Labels in the CSVs are `positif`, `neutre`, `negatif` (no accent).
 - `textes.csv` (24 rows) is the **train set**. The reference texts in `images.csv` (`texte_attendu_ocr`) and `audios.csv` (`transcription_reference`) are the **test set** (18 rows). Cross-validation on 24 rows is not reliable, so use this test set.
 - Audio files are `.mp3`, but `audios.csv` lists them as `.wav`.
 - `sentiment/preprocessing.py::clean_text` is the `preprocessor` of the saved `TfidfVectorizer`, so `vectorizer.pkl` needs the `sentiment` package to be importable when it loads.
@@ -91,7 +91,7 @@ Every prediction route returns the same JSON shape:
 ## Tests (`tests/`, config in `pytest.ini`)
 
 - `test_api.py`: HTTP integration tests with `TestClient` (200 + unified JSON shape, 422 on bad payloads, for all 4 routes). `test_sentiment.py`: unit tests (cleaning, model, OCR, magic-byte detection).
-- Test files are **generated in code** (`conftest.py`: text images with Pillow, silent WAV), because the dataset is not in git. Tests that need a real voice or accents use dataset files and are skipped when the dataset is missing.
+- Test files are **generated in code** (`conftest.py`: text images with Pillow, silent WAV), so most tests do not depend on the dataset. Tests that need a real voice or accents use dataset files and are skipped when the dataset is missing.
 - Pillow's built-in font has no accented letters: do not put accents in generated test images.
 - `@pytest.mark.slow` = runs Whisper.
 

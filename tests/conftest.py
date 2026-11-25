@@ -1,6 +1,6 @@
-"""Shared fixtures. Test files are generated in code, so the tests do not
-need the dataset folder (it is not in git). Only the real-voice audio tests
-use the dataset, and they are skipped when it is missing."""
+"""Shared fixtures. Test files are generated in code, so most tests do not
+depend on the dataset folder. Only the real-voice and accent tests use
+dataset files, and they are skipped when the dataset is missing."""
 
 import io
 import wave
