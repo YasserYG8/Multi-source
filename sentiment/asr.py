@@ -9,6 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Union
 
+import av
 from faster_whisper import WhisperModel
 
 # "small" is a good balance for French on CPU. Change it with the
@@ -16,6 +17,10 @@ from faster_whisper import WhisperModel
 WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL", "small")
 
 AudioSource = Union[str, Path, bytes]
+
+
+class InvalidAudioError(ValueError):
+    """The file looks like audio but cannot be decoded."""
 
 
 @lru_cache(maxsize=1)
@@ -27,5 +32,8 @@ def get_whisper_model() -> WhisperModel:
 def transcribe_audio(source: AudioSource) -> str:
     """Return the French transcription of an audio file or raw audio bytes."""
     audio = io.BytesIO(source) if isinstance(source, bytes) else str(source)
-    segments, _info = get_whisper_model().transcribe(audio, language="fr", beam_size=5)
+    try:
+        segments, _info = get_whisper_model().transcribe(audio, language="fr", beam_size=5)
+    except av.error.FFmpegError as error:
+        raise InvalidAudioError("Fichier audio illisible.") from error
     return " ".join(segment.text.strip() for segment in segments).strip()

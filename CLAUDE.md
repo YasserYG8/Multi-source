@@ -36,6 +36,14 @@ Keep the OCR and ASR modules separate from the classifier. They only produce tex
 - `asr.py`: faster-whisper `small` model (cached in `~/.cache/huggingface`), CPU int8, `language="fr"`, loaded once. Override the size with the `WHISPER_MODEL` env var.
 - Source labels in the response: `texte`, `image`, `audio`.
 
+## API layout (`main.py` + `api/` package)
+
+- `main.py`: app, CORS (open, for the Step 4 page), `/health`, and the handler that turns `EmptyTextError` / `InvalidAudioError` into 422.
+- `api/routes.py`: `APIRouter` with prefix `/predict`. Text route takes JSON `{"texte": ...}`. File routes take the multipart field **`fichier`**. `POST /predict` takes a form with exactly one of `texte` or `fichier`. OCR/ASR run with `run_in_threadpool`.
+- `api/uploads.py`: the `UploadedFile` Pydantic model. The real type is detected from **magic bytes**, not the filename or the client Content-Type. Limits: image 5 MB, audio 10 MB. Validation errors are raised as `RequestValidationError`.
+- Every 422 uses the FastAPI shape: `{"detail": [{"type", "loc", "msg"}]}`.
+- When you test with `curl` from Git Bash, accented JSON gets the wrong encoding (400). Send a UTF-8 file with `--data-binary @file.json`.
+
 ## Required pieces (from the brief)
 
 1. **Training script**: load `textes.csv`, minimal cleaning (lowercase, stop-words), `TfidfVectorizer` + Logistic Regression or SVM (scikit-learn). Print a confusion matrix and a classification report. Save `model.pkl` and `vectorizer.pkl`.
@@ -65,9 +73,10 @@ Every prediction route returns the same JSON shape:
 - Train the model (Step 1, done): `python train.py` → writes `models/*.pkl` and `reports/`
 - Check OCR + ASR on all dataset files (Step 2, done): `python evaluate_pipelines.py` → `reports/pipelines_results.csv` (takes ~1–2 min, mostly Whisper on CPU)
 
+- Run the API (Step 3, done): `uvicorn main:app --reload` → Swagger at http://127.0.0.1:8000/docs
+
 These come from the brief. They work once the code exists:
 
-- Run the API: `uvicorn main:app --reload`
 - Run all tests: `pytest`
 - Run one test: `pytest test_api.py::test_name`
 - Install deps: `pip install -r requirements.txt` (or `pyproject.toml`)
