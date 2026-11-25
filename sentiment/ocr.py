@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Union
 
 import pytesseract
-from PIL import Image, ImageOps
+from PIL import Image, ImageLOps
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TESSDATA_DIR = PROJECT_DIR / "tessdata"  # holds fra.traineddata
