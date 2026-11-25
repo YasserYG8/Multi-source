@@ -28,6 +28,30 @@ Keep the OCR and ASR modules separate from the classifier. They only produce tex
 - `sentiment/preprocessing.py::clean_text` is the `preprocessor` of the saved `TfidfVectorizer`, so `vectorizer.pkl` needs the `sentiment` package to be importable when it loads.
 - Model: TF-IDF `char_wb` 2–5 grams + `LogisticRegression` (gives probabilities for `confiance`). Test accuracy 0.89.
 
+## Code layout (`sentiment/` package)
+
+- `pipeline.py` is the cascade and the entry point for the API: `predict_text`, `predict_image`, `predict_audio` all return the unified dict. Image and audio functions accept a file path or raw `bytes` (for uploads).
+- `classifier.py` loads the `.pkl` files once (`lru_cache`). It raises `EmptyTextError` (a `ValueError`) when there is no text; the API should map it to 422.
+- `ocr.py`: grayscale + 2x upscale + autocontrast, then Tesseract `lang="fra"`.
+- `asr.py`: faster-whisper `small` model (cached in `~/.cache/huggingface`), CPU int8, `language="fr"`, loaded once. `vad_filter=True` is required: without it, Whisper invents text on silence ("Sous-titres réalisés par… Amara.org"). Override the size with the `WHISPER_MODEL` env var.
+- Source labels in the response: `texte`, `image`, `audio`.
+
+## API layout (`main.py` + `api/` package)
+
+- `main.py`: app, CORS (open, for the Step 4 page), `/health`, and the handler that turns `EmptyTextError` / `InvalidAudioError` into 422.
+- `api/routes.py`: `APIRouter` with prefix `/predict`. Text route takes JSON `{"texte": ...}`. File routes take the multipart field **`fichier`**. `POST /predict` takes a form with exactly one of `texte` or `fichier`. OCR/ASR run with `run_in_threadpool`.
+- `api/uploads.py`: the `UploadedFile` Pydantic model. The real type is detected from **magic bytes**, not the filename or the client Content-Type. Limits: image 5 MB, audio 10 MB. Validation errors are raised as `RequestValidationError`.
+- Every 422 uses the FastAPI shape: `{"detail": [{"type", "loc", "msg"}]}`.
+- `main.py` lifespan loads the `.pkl` files, then loads Whisper in a background thread (it takes ~15 s), so the first audio request is not slow.
+
+## Test web page (Step 4, `web/` + `api/demo.py`)
+
+- Served by FastAPI: `GET /` → `web/index.html`, `/static/*` → `web/`. Plain HTML/CSS/JS, no build step. UI text is in French.
+- `GET /demo/exemples` lists the dataset images/audios with their reference sentiment, and `/demo/fichiers/*` serves the files (only if the dataset folder exists). The page uses them as one-click examples and shows ✓ / ✗ against the reference.
+- Design: a "shipping label" look (kraft ground, label with black rules, sentiment as a stamp). Font: Archivo, self-hosted in `web/fonts/` (OFL) so the demo works offline. Product context for design work is in `PRODUCT.md`.
+- The page reads 422 errors as `detail[].msg`. Keep that shape if you change the API.
+- When you test with `curl` from Git Bash, accented JSON gets the wrong encoding (400). Send a UTF-8 file with `--data-binary @file.json`.
+
 ## Required pieces (from the brief)
 
 1. **Training script**: load `textes.csv`, minimal cleaning (lowercase, stop-words), `TfidfVectorizer` + Logistic Regression or SVM (scikit-learn). Print a confusion matrix and a classification report. Save `model.pkl` and `vectorizer.pkl`.
@@ -55,16 +79,24 @@ Every prediction route returns the same JSON shape:
 ## Commands
 
 - Train the model (Step 1, done): `python train.py` → writes `models/*.pkl` and `reports/`
+- Check OCR + ASR on all dataset files (Step 2, done): `python evaluate_pipelines.py` → `reports/pipelines_results.csv` (takes ~1–2 min, mostly Whisper on CPU)
 
-These come from the brief. They work once the code exists:
+- Run the API (Step 3, done): `uvicorn main:app --reload` → test page at http://127.0.0.1:8000/, Swagger at http://127.0.0.1:8000/docs
 
-- Run the API: `uvicorn main:app --reload`
-- Run all tests: `pytest`
-- Run one test: `pytest test_api.py::test_name`
-- Install deps: `pip install -r requirements.txt` (or `pyproject.toml`)
+- Run all tests (Step 5, done): `pytest` (~30 s, 72 tests). Fast run without Whisper: `pytest -m "not slow"` (~10 s)
+- Run one test: `pytest tests/test_api.py::test_health`
+- Coverage: `pytest --cov=api --cov=sentiment --cov=main`
+- Install deps: `pip install -r requirements.txt`
+
+## Tests (`tests/`, config in `pytest.ini`)
+
+- `test_api.py`: HTTP integration tests with `TestClient` (200 + unified JSON shape, 422 on bad payloads, for all 4 routes). `test_sentiment.py`: unit tests (cleaning, model, OCR, magic-byte detection).
+- Test files are **generated in code** (`conftest.py`: text images with Pillow, silent WAV), because the dataset is not in git. Tests that need a real voice or accents use dataset files and are skipped when the dataset is missing.
+- Pillow's built-in font has no accented letters: do not put accents in generated test images.
+- `@pytest.mark.slow` = runs Whisper.
 
 System dependencies:
-- Tesseract 5.4 is installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`, but it is **not on PATH**, so set `pytesseract.pytesseract.tesseract_cmd` to that path. The language files (`fra`, `eng`, `osd`) are in the project folder `tessdata/`, because Program Files needs admin rights. Call it with `lang="fra", config="--tessdata-dir tessdata"`.
+- Tesseract 5.4 is installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`, but it is **not on PATH**, so set `pytesseract.pytesseract.tesseract_cmd` to that path. The language files (`fra`, `eng`, `osd`) are in the project folder `tessdata/`, because Program Files needs admin rights. `sentiment/ocr.py` sets both on import (it uses the `TESSDATA_PREFIX` env var, because `--tessdata-dir` breaks on the space in the project path).
 - ASR uses `faster-whisper` (already installed), not `openai-whisper`. `ffmpeg` is on PATH.
 
 ## Deliverables

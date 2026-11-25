@@ -1,7 +1,22 @@
+# Model (step 1)
 pandas==2.3.3
 scikit-learn==1.7.2
 joblib
 matplotlib==3.10.1
+
+# OCR + audio transcription (step 2)
+# Also needs the Tesseract program: winget install --id UB-Mannheim.TesseractOCR
 pytesseract==0.3.13
 pillow==11.1.0
 faster-whisper==1.2.1
+
+# API (step 3)
+fastapi==0.139.0
+uvicorn==0.34.3
+pydantic==2.11.6
+python-multipart==0.0.32
+
+# Tests (step 5)
+pytest==9.1.1
+pytest-cov==7.1.0
+httpx==0.28.1
