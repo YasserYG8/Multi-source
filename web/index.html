@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tri des avis clients</title>
+  <meta name="description" content="Page de test : prédire le sentiment d'un avis client e-commerce à partir d'un texte, d'une image ou d'un audio.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23c8a47a'/%3E%3Crect x='6' y='8' width='20' height='16' rx='1.5' fill='%23fdfdfb' stroke='%23201c17' stroke-width='2'/%3E%3Cpath d='M10 14h12M10 18h7' stroke='%23201c17' stroke-width='2'/%3E%3C/svg%3E">
+  <link rel="preload" href="/static/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 6h16M4 10h16M4 14h10M4 18h7"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><circle cx="9" cy="10" r="1.8"/><path d="m3 17 5-4.5 4 3.5 3-2.5 6 5"/></symbol>
+    <symbol id="i-audio" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol>
+    <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M14 7l5 5-5 5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-cross" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
+  </svg>
+
+  <header class="masthead">
+    <div class="masthead__title">
+      <h1>Tri des avis clients</h1>
+      <p>Texte, capture d'écran ou message vocal : tout devient texte, puis un seul modèle décide du sentiment.</p>
+    </div>
+    <nav class="masthead__links" aria-label="Liens">
+      <span class="status" id="api-status" data-state="checking"><span class="status__dot"></span><span class="status__label">Connexion à l'API…</span></span>
+      <a class="link-button" href="/docs" target="_blank" rel="noopener">Documentation API (Swagger)</a>
+    </nav>
+  </header>
+
+  <main class="workbench">
+    <!-- ============ ENVOI ============ -->
+    <section class="sheet sheet--input" aria-labelledby="input-title">
+      <h2 id="input-title" class="sheet__title">Envoyer un avis</h2>
+
+      <div class="tabs" role="tablist" aria-label="Type d'avis">
+        <button role="tab" id="tab-texte" aria-controls="panel-texte" aria-selected="true" data-source="texte">
+          <svg class="icon"><use href="#i-text"/></svg>Texte
+        </button>
+        <button role="tab" id="tab-image" aria-controls="panel-image" aria-selected="false" tabindex="-1" data-source="image">
+          <svg class="icon"><use href="#i-image"/></svg>Image
+        </button>
+        <button role="tab" id="tab-audio" aria-controls="panel-audio" aria-selected="false" tabindex="-1" data-source="audio">
+          <svg class="icon"><use href="#i-audio"/></svg>Audio
+        </button>
+      </div>
+
+      <form id="form" novalidate>
+        <!-- Texte -->
+        <div class="panel" role="tabpanel" id="panel-texte" aria-labelledby="tab-texte">
+          <label class="field-label" for="texte">Avis du client</label>
+          <textarea id="texte" rows="6" maxlength="5000" placeholder="Ex. : Colis reçu avec deux jours de retard, mais le produit fonctionne parfaitement."></textarea>
+          <div class="field-foot">
+            <span class="hint">Ctrl + Entrée pour analyser</span>
+            <span class="counter" id="counter">0 / 5000</span>
+          </div>
+          <div class="examples">
+            <p class="examples__label">Essayer une phrase</p>
+            <div class="chips" id="text-examples"></div>
+          </div>
+        </div>
+
+        <!-- Image -->
+        <div class="panel" role="tabpanel" id="panel-image" aria-labelledby="tab-image" hidden>
+          <div class="drop" id="drop-image" data-kind="image">
+            <input type="file" id="file-image" accept="image/png,image/jpeg,image/webp,image/bmp,image/tiff" class="visually-hidden">
+            <label for="file-image" class="drop__body">
+              <svg class="icon icon--lg"><use href="#i-upload"/></svg>
+              <span class="drop__main">Déposez une image, collez une capture (Ctrl + V) ou <u>parcourez</u></span>
+              <span class="drop__sub">PNG, JPEG, WEBP, BMP, TIFF · 5 Mo max</span>
+            </label>
+            <figure class="drop__preview" hidden>
+              <img alt="Aperçu de l'image envoyée" id="preview-image">
+              <figcaption><span class="file-name"></span><button type="button" class="text-button" data-clear="image">Retirer</button></figcaption>
+            </figure>
+          </div>
+          <div class="examples" id="image-examples-block" hidden>
+            <p class="examples__label">Images du dataset</p>
+            <div class="thumbs" id="image-examples"></div>
+          </div>
+        </div>
+
+        <!-- Audio -->
+        <div class="panel" role="tabpanel" id="panel-audio" aria-labelledby="tab-audio" hidden>
+          <div class="drop" id="drop-audio" data-kind="audio">
+            <input type="file" id="file-audio" accept="audio/wav,audio/x-wav,audio/mpeg,audio/ogg,audio/flac,audio/webm,audio/mp4,.wav,.mp3,.ogg,.flac,.webm,.m4a" class="visually-hidden">
+            <label for="file-audio" class="drop__body">
+              <svg class="icon icon--lg"><use href="#i-upload"/></svg>
+              <span class="drop__main">Déposez un fichier audio ou <u>parcourez</u></span>
+              <span class="drop__sub">WAV, MP3, OGG, FLAC, WEBM, M4A · 10 Mo max</span>
+            </label>
+            <figure class="drop__preview" hidden>
+              <audio controls id="preview-audio"></audio>
+              <figcaption><span class="file-name"></span><button type="button" class="text-button" data-clear="audio">Retirer</button></figcaption>
+            </figure>
+          </div>
+          <div class="record">
+            <button type="button" class="button button--ghost" id="record">
+              <svg class="icon"><use href="#i-record"/></svg><span>Enregistrer au micro</span>
+            </button>
+            <span class="record__time" id="record-time" aria-live="polite"></span>
+          </div>
+          <div class="examples" id="audio-examples-block" hidden>
+            <p class="examples__label">Messages vocaux du dataset</p>
+            <div class="chips" id="audio-examples"></div>
+          </div>
+        </div>
+
+        <button type="submit" class="button button--primary" id="submit">
+          <span>Analyser l'avis</span><svg class="icon"><use href="#i-arrow"/></svg>
+        </button>
+      </form>
+    </section>
+
+    <!-- ============ ÉTIQUETTE ============ -->
+    <section class="sheet sheet--label" aria-labelledby="label-title" aria-busy="false" id="label">
+      <h2 id="label-title" class="visually-hidden">Résultat</h2>
+
+      <ol class="route" aria-label="Chemin de l'avis dans la cascade">
+        <li class="route__stop" data-stop="source"><span class="route__name">Entrée</span><span class="route__value" id="route-source">—</span></li>
+        <li class="route__stop" data-stop="convert"><span class="route__name">Conversion</span><span class="route__value" id="route-convert">—</span></li>
+        <li class="route__stop" data-stop="model"><span class="route__name">Modèle</span><span class="route__value">TF-IDF + Rég. logistique</span></li>
+        <li class="route__stop" data-stop="result"><span class="route__name">Sortie</span><span class="route__value" id="route-result">—</span></li>
+      </ol>
+
+      <div class="verdict" aria-live="polite" id="verdict">
+        <div class="verdict__zone">
+          <p class="zone-label">Sentiment prédit</p>
+          <p class="stamp" id="stamp" data-sentiment="vide">En attente</p>
+          <p class="verdict__check" id="check" hidden></p>
+        </div>
+
+        <div class="confidence">
+          <div class="confidence__head">
+            <p class="zone-label">Confiance</p>
+            <p class="confidence__value"><span id="conf-value">—</span></p>
+          </div>
+          <div class="gauge" id="gauge" role="img" aria-label="Pas encore de résultat">
+            <div class="gauge__fill" id="gauge-fill"></div>
+            <span class="gauge__mark" style="--at: 33.33%"><span>hasard (1/3)</span></span>
+            <span class="gauge__tick" style="--at: 50%"></span>
+          </div>
+          <p class="confidence__note">Probabilité donnée par le modèle à la classe choisie. Avec 3 classes, un tirage au hasard donne 0,33.</p>
+        </div>
+      </div>
+
+      <div class="contents">
+        <div class="contents__head">
+          <p class="zone-label" id="contents-label">Texte analysé</p>
+          <p class="meta" id="meta"></p>
+        </div>
+        <blockquote class="contents__text" id="extracted"><p class="placeholder">Choisissez une source à gauche, puis lancez l'analyse. Le texte lu par l'OCR ou la transcription apparaîtra ici.</p></blockquote>
+      </div>
+
+      <div class="error" id="error" role="alert" hidden></div>
+    </section>
+
+    <!-- ============ REGISTRE ============ -->
+    <section class="ledger" aria-labelledby="ledger-title">
+      <div class="ledger__head">
+        <h2 id="ledger-title">Registre des envois</h2>
+        <p class="ledger__summary" id="ledger-summary">Aucun envoi pour le moment.</p>
+      </div>
+      <div class="ledger__scroll">
+        <table>
+          <thead><tr><th scope="col">N°</th><th scope="col">Source</th><th scope="col">Texte analysé</th><th scope="col">Sentiment</th><th scope="col" class="num">Confiance</th><th scope="col">Attendu</th><th scope="col" class="num">Durée</th></tr></thead>
+          <tbody id="ledger-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

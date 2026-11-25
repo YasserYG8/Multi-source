@@ -1,23 +1,29 @@
 """FastAPI app: multi-source sentiment classifier (text, image, audio).
 
 Run:  uvicorn main:app --reload
-Docs: http://127.0.0.1:8000/docs
+Page: http://127.0.0.1:8000/       (test web page)
+Docs: http://127.0.0.1:8000/docs   (Swagger)
 """
 
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from api.demo import mount_demo
 from api.routes import router
-from sentiment.asr import InvalidAudioError
+from sentiment.asr import InvalidAudioError, get_whisper_model
 from sentiment.classifier import EmptyTextError, load_artifacts
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_artifacts()  # load the .pkl files at startup, not on the first request
+    # Whisper takes ~15 s to load: do it in the background so the server starts
+    # at once and the first audio request (e.g. during a demo) is not slow.
+    threading.Thread(target=get_whisper_model, daemon=True).start()
     yield
 
 
@@ -38,6 +44,7 @@ app = FastAPI(
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 app.include_router(router)
+mount_demo(app)  # test web page at "/" (Step 4)
 
 
 @app.exception_handler(EmptyTextError)

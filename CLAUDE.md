@@ -42,6 +42,14 @@ Keep the OCR and ASR modules separate from the classifier. They only produce tex
 - `api/routes.py`: `APIRouter` with prefix `/predict`. Text route takes JSON `{"texte": ...}`. File routes take the multipart field **`fichier`**. `POST /predict` takes a form with exactly one of `texte` or `fichier`. OCR/ASR run with `run_in_threadpool`.
 - `api/uploads.py`: the `UploadedFile` Pydantic model. The real type is detected from **magic bytes**, not the filename or the client Content-Type. Limits: image 5 MB, audio 10 MB. Validation errors are raised as `RequestValidationError`.
 - Every 422 uses the FastAPI shape: `{"detail": [{"type", "loc", "msg"}]}`.
+- `main.py` lifespan loads the `.pkl` files, then loads Whisper in a background thread (it takes ~15 s), so the first audio request is not slow.
+
+## Test web page (Step 4, `web/` + `api/demo.py`)
+
+- Served by FastAPI: `GET /` → `web/index.html`, `/static/*` → `web/`. Plain HTML/CSS/JS, no build step. UI text is in French.
+- `GET /demo/exemples` lists the dataset images/audios with their reference sentiment, and `/demo/fichiers/*` serves the files (only if the dataset folder exists). The page uses them as one-click examples and shows ✓ / ✗ against the reference.
+- Design: a "shipping label" look (kraft ground, label with black rules, sentiment as a stamp). Font: Archivo, self-hosted in `web/fonts/` (OFL) so the demo works offline. Product context for design work is in `PRODUCT.md`.
+- The page reads 422 errors as `detail[].msg`. Keep that shape if you change the API.
 - When you test with `curl` from Git Bash, accented JSON gets the wrong encoding (400). Send a UTF-8 file with `--data-binary @file.json`.
 
 ## Required pieces (from the brief)
@@ -73,7 +81,7 @@ Every prediction route returns the same JSON shape:
 - Train the model (Step 1, done): `python train.py` → writes `models/*.pkl` and `reports/`
 - Check OCR + ASR on all dataset files (Step 2, done): `python evaluate_pipelines.py` → `reports/pipelines_results.csv` (takes ~1–2 min, mostly Whisper on CPU)
 
-- Run the API (Step 3, done): `uvicorn main:app --reload` → Swagger at http://127.0.0.1:8000/docs
+- Run the API (Step 3, done): `uvicorn main:app --reload` → test page at http://127.0.0.1:8000/, Swagger at http://127.0.0.1:8000/docs
 
 These come from the brief. They work once the code exists:
 
