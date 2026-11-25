@@ -33,7 +33,7 @@ Keep the OCR and ASR modules separate from the classifier. They only produce tex
 - `pipeline.py` is the cascade and the entry point for the API: `predict_text`, `predict_image`, `predict_audio` all return the unified dict. Image and audio functions accept a file path or raw `bytes` (for uploads).
 - `classifier.py` loads the `.pkl` files once (`lru_cache`). It raises `EmptyTextError` (a `ValueError`) when there is no text; the API should map it to 422.
 - `ocr.py`: grayscale + 2x upscale + autocontrast, then Tesseract `lang="fra"`.
-- `asr.py`: faster-whisper `small` model (cached in `~/.cache/huggingface`), CPU int8, `language="fr"`, loaded once. Override the size with the `WHISPER_MODEL` env var.
+- `asr.py`: faster-whisper `small` model (cached in `~/.cache/huggingface`), CPU int8, `language="fr"`, loaded once. `vad_filter=True` is required: without it, Whisper invents text on silence ("Sous-titres réalisés par… Amara.org"). Override the size with the `WHISPER_MODEL` env var.
 - Source labels in the response: `texte`, `image`, `audio`.
 
 ## API layout (`main.py` + `api/` package)
@@ -83,11 +83,17 @@ Every prediction route returns the same JSON shape:
 
 - Run the API (Step 3, done): `uvicorn main:app --reload` → test page at http://127.0.0.1:8000/, Swagger at http://127.0.0.1:8000/docs
 
-These come from the brief. They work once the code exists:
+- Run all tests (Step 5, done): `pytest` (~30 s, 72 tests). Fast run without Whisper: `pytest -m "not slow"` (~10 s)
+- Run one test: `pytest tests/test_api.py::test_health`
+- Coverage: `pytest --cov=api --cov=sentiment --cov=main`
+- Install deps: `pip install -r requirements.txt`
 
-- Run all tests: `pytest`
-- Run one test: `pytest test_api.py::test_name`
-- Install deps: `pip install -r requirements.txt` (or `pyproject.toml`)
+## Tests (`tests/`, config in `pytest.ini`)
+
+- `test_api.py`: HTTP integration tests with `TestClient` (200 + unified JSON shape, 422 on bad payloads, for all 4 routes). `test_sentiment.py`: unit tests (cleaning, model, OCR, magic-byte detection).
+- Test files are **generated in code** (`conftest.py`: text images with Pillow, silent WAV), because the dataset is not in git. Tests that need a real voice or accents use dataset files and are skipped when the dataset is missing.
+- Pillow's built-in font has no accented letters: do not put accents in generated test images.
+- `@pytest.mark.slow` = runs Whisper.
 
 System dependencies:
 - Tesseract 5.4 is installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`, but it is **not on PATH**, so set `pytesseract.pytesseract.tesseract_cmd` to that path. The language files (`fra`, `eng`, `osd`) are in the project folder `tessdata/`, because Program Files needs admin rights. `sentiment/ocr.py` sets both on import (it uses the `TESSDATA_PREFIX` env var, because `--tessdata-dir` breaks on the space in the project path).
