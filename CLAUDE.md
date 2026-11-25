@@ -28,6 +28,14 @@ Keep the OCR and ASR modules separate from the classifier. They only produce tex
 - `sentiment/preprocessing.py::clean_text` is the `preprocessor` of the saved `TfidfVectorizer`, so `vectorizer.pkl` needs the `sentiment` package to be importable when it loads.
 - Model: TF-IDF `char_wb` 2–5 grams + `LogisticRegression` (gives probabilities for `confiance`). Test accuracy 0.89.
 
+## Code layout (`sentiment/` package)
+
+- `pipeline.py` is the cascade and the entry point for the API: `predict_text`, `predict_image`, `predict_audio` all return the unified dict. Image and audio functions accept a file path or raw `bytes` (for uploads).
+- `classifier.py` loads the `.pkl` files once (`lru_cache`). It raises `EmptyTextError` (a `ValueError`) when there is no text; the API should map it to 422.
+- `ocr.py`: grayscale + 2x upscale + autocontrast, then Tesseract `lang="fra"`.
+- `asr.py`: faster-whisper `small` model (cached in `~/.cache/huggingface`), CPU int8, `language="fr"`, loaded once. Override the size with the `WHISPER_MODEL` env var.
+- Source labels in the response: `texte`, `image`, `audio`.
+
 ## Required pieces (from the brief)
 
 1. **Training script**: load `textes.csv`, minimal cleaning (lowercase, stop-words), `TfidfVectorizer` + Logistic Regression or SVM (scikit-learn). Print a confusion matrix and a classification report. Save `model.pkl` and `vectorizer.pkl`.
@@ -55,6 +63,7 @@ Every prediction route returns the same JSON shape:
 ## Commands
 
 - Train the model (Step 1, done): `python train.py` → writes `models/*.pkl` and `reports/`
+- Check OCR + ASR on all dataset files (Step 2, done): `python evaluate_pipelines.py` → `reports/pipelines_results.csv` (takes ~1–2 min, mostly Whisper on CPU)
 
 These come from the brief. They work once the code exists:
 
@@ -64,7 +73,7 @@ These come from the brief. They work once the code exists:
 - Install deps: `pip install -r requirements.txt` (or `pyproject.toml`)
 
 System dependencies:
-- Tesseract 5.4 is installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`, but it is **not on PATH**, so set `pytesseract.pytesseract.tesseract_cmd` to that path. The language files (`fra`, `eng`, `osd`) are in the project folder `tessdata/`, because Program Files needs admin rights. Call it with `lang="fra", config="--tessdata-dir tessdata"`.
+- Tesseract 5.4 is installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`, but it is **not on PATH**, so set `pytesseract.pytesseract.tesseract_cmd` to that path. The language files (`fra`, `eng`, `osd`) are in the project folder `tessdata/`, because Program Files needs admin rights. `sentiment/ocr.py` sets both on import (it uses the `TESSDATA_PREFIX` env var, because `--tessdata-dir` breaks on the space in the project path).
 - ASR uses `faster-whisper` (already installed), not `openai-whisper`. `ffmpeg` is on PATH.
 
 ## Deliverables
