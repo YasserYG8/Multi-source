@@ -20,6 +20,14 @@ A multi-source sentiment classifier for e-commerce customer reviews. Labels are 
 
 Keep the OCR and ASR modules separate from the classifier. They only produce text. All routes must share the same prediction function.
 
+## Data and current model
+
+- Data is in `dataset_sentiment_ecommerce/` (ignored by `.gitignore`). Labels in the CSVs are `positif`, `neutre`, `negatif` (no accent).
+- `textes.csv` (24 rows) is the **train set**. The reference texts in `images.csv` (`texte_attendu_ocr`) and `audios.csv` (`transcription_reference`) are the **test set** (18 rows). Cross-validation on 24 rows is not reliable, so use this test set.
+- Audio files are `.mp3`, but `audios.csv` lists them as `.wav`.
+- `sentiment/preprocessing.py::clean_text` is the `preprocessor` of the saved `TfidfVectorizer`, so `vectorizer.pkl` needs the `sentiment` package to be importable when it loads.
+- Model: TF-IDF `char_wb` 2–5 grams + `LogisticRegression` (gives probabilities for `confiance`). Test accuracy 0.89.
+
 ## Required pieces (from the brief)
 
 1. **Training script**: load `textes.csv`, minimal cleaning (lowercase, stop-words), `TfidfVectorizer` + Logistic Regression or SVM (scikit-learn). Print a confusion matrix and a classification report. Save `model.pkl` and `vectorizer.pkl`.
@@ -46,6 +54,8 @@ Every prediction route returns the same JSON shape:
 
 ## Commands
 
+- Train the model (Step 1, done): `python train.py` → writes `models/*.pkl` and `reports/`
+
 These come from the brief. They work once the code exists:
 
 - Run the API: `uvicorn main:app --reload`
@@ -53,7 +63,9 @@ These come from the brief. They work once the code exists:
 - Run one test: `pytest test_api.py::test_name`
 - Install deps: `pip install -r requirements.txt` (or `pyproject.toml`)
 
-System dependencies: Tesseract OCR must be installed on Windows and on PATH for `pytesseract`. `openai-whisper` needs `ffmpeg`.
+System dependencies:
+- Tesseract 5.4 is installed at `C:\Program Files\Tesseract-OCR\tesseract.exe`, but it is **not on PATH**, so set `pytesseract.pytesseract.tesseract_cmd` to that path. The language files (`fra`, `eng`, `osd`) are in the project folder `tessdata/`, because Program Files needs admin rights. Call it with `lang="fra", config="--tessdata-dir tessdata"`.
+- ASR uses `faster-whisper` (already installed), not `openai-whisper`. `ffmpeg` is on PATH.
 
 ## Deliverables
 
